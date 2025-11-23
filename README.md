@@ -1,0 +1,2 @@
+# Tabular-Review-
+An AI-powered tabular review tool for legal professionals. Ingest unstructured documents, define dynamic extraction columns, and query your data with an integrated analyst chat.
