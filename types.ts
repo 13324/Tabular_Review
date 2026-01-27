@@ -43,3 +43,29 @@ export interface ChatMessage {
 
 export type ViewMode = 'grid' | 'chat';
 export type SidebarMode = 'none' | 'verify' | 'chat';
+
+// Project persistence types
+export interface SavedProject {
+  version: 1;
+  name: string;
+  savedAt: string;  // ISO timestamp
+  columns: Column[];
+  documents: DocumentFile[];
+  results: ExtractionResult;
+  selectedModel: string;
+}
+
+// Column template library types
+export interface ColumnTemplate {
+  id: string;
+  name: string;
+  type: ColumnType;
+  prompt: string;
+  category?: string;  // e.g., "Legal", "Financial", "Dates"
+  createdAt: string;
+}
+
+export interface ColumnLibrary {
+  version: 1;
+  templates: ColumnTemplate[];
+}

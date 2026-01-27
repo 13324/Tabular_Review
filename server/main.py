@@ -1,9 +1,14 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from docling.document_converter import DocumentConverter
+from docling.datamodel.pipeline_options import PdfPipelineOptions
+from docling.datamodel.accelerator_options import AcceleratorDevice, AcceleratorOptions
+from docling.datamodel.base_models import InputFormat
+from docling.document_converter import PdfFormatOption
 import tempfile
 import os
 import shutil
+import platform
 
 app = FastAPI()
 
@@ -11,6 +16,7 @@ app = FastAPI()
 # In production, replace with specific origins
 origins = [
     "http://localhost:3000",
+    "http://localhost:3001",
     "http://localhost:5173", # Vite default
 ]
 
@@ -22,8 +28,33 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize converter (this might take a moment to load models on startup)
-converter = DocumentConverter()
+# Initialize converter with GPU acceleration if available
+# Use MPS (Metal Performance Shaders) on Apple Silicon Macs
+def create_converter():
+    if platform.system() == "Darwin":  # macOS
+        print("Detected macOS - enabling MPS (Metal) GPU acceleration")
+        accelerator_options = AcceleratorOptions(
+            device=AcceleratorDevice.MPS,
+            num_threads=4
+        )
+    else:
+        print("Running on CPU (MPS not available)")
+        accelerator_options = AcceleratorOptions(
+            device=AcceleratorDevice.AUTO,
+            num_threads=4
+        )
+    
+    # Configure PDF pipeline with accelerator options
+    pdf_pipeline_options = PdfPipelineOptions()
+    pdf_pipeline_options.accelerator_options = accelerator_options
+    
+    return DocumentConverter(
+        format_options={
+            InputFormat.PDF: PdfFormatOption(pipeline_options=pdf_pipeline_options)
+        }
+    )
+
+converter = create_converter()
 
 @app.post("/convert")
 async def convert_document(file: UploadFile = File(...)):

@@ -36,7 +36,12 @@ import {
   Quote,
   Download,
   Minus,
-  WrapText
+  WrapText,
+  Save,
+  FolderOpen,
+  Library,
+  RotateCcw,
+  RefreshCw
 } from 'lucide-react';
 
 export { 
@@ -76,5 +81,10 @@ export {
   Quote,
   Download,
   Minus,
-  WrapText
+  WrapText,
+  Save,
+  FolderOpen,
+  Library,
+  RotateCcw,
+  RefreshCw
 };

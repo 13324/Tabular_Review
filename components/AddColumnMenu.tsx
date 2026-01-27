@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { ColumnType } from '../types';
+import { ColumnType, ColumnTemplate } from '../types';
 import { generatePromptHelper } from '../services/geminiService';
+import { addTemplateToLibrary } from '../utils/fileStorage';
 import { 
   X, 
   HelpCircle, 
@@ -13,7 +14,9 @@ import {
   Calendar,
   CheckSquare,
   List,
-  Trash2
+  Trash2,
+  Library,
+  Save
 } from './Icons';
 
 const COLUMN_TYPES: { type: ColumnType; label: string; icon: React.FC<any> }[] = [
@@ -31,6 +34,7 @@ interface AddColumnMenuProps {
   onDelete?: () => void;
   modelId: string;
   initialData?: { name: string; type: ColumnType; prompt: string };
+  onOpenLibrary?: () => void;
 }
 
 export const AddColumnMenu: React.FC<AddColumnMenuProps> = ({
@@ -39,11 +43,14 @@ export const AddColumnMenu: React.FC<AddColumnMenuProps> = ({
   onSave,
   onDelete,
   modelId,
-  initialData
+  initialData,
+  onOpenLibrary
 }) => {
   const [name, setName] = useState(initialData?.name || '');
   const [type, setType] = useState<ColumnType>(initialData?.type || 'text');
   const [prompt, setPrompt] = useState(initialData?.prompt || '');
+  const [category, setCategory] = useState('');
+  const [saveToLibrary, setSaveToLibrary] = useState(false);
   
   const [isTypeMenuOpen, setIsTypeMenuOpen] = useState(false);
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
@@ -79,6 +86,15 @@ export const AddColumnMenu: React.FC<AddColumnMenuProps> = ({
 
   const handleSave = () => {
     if (name && prompt) {
+      // Save to library if checkbox is checked
+      if (saveToLibrary) {
+        addTemplateToLibrary({
+          name,
+          type,
+          prompt,
+          category: category || undefined
+        });
+      }
       onSave({ name, type, prompt });
     }
   };
@@ -174,18 +190,54 @@ export const AddColumnMenu: React.FC<AddColumnMenuProps> = ({
                     </button>
                 </div>
             </div>
+
+            {/* Save to Library Option */}
+            <div className="space-y-2 pt-2 border-t border-slate-100">
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={saveToLibrary}
+                  onChange={(e) => setSaveToLibrary(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span className="text-xs font-medium text-slate-600 group-hover:text-slate-800">
+                  Save to Column Library
+                </span>
+              </label>
+              
+              {saveToLibrary && (
+                <input
+                  type="text"
+                  placeholder="Category (optional, e.g. Legal, Financial)"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-900 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all placeholder:text-slate-400"
+                />
+              )}
+            </div>
         </div>
 
-        <div className={`px-5 py-3 bg-slate-50 border-t border-slate-100 flex ${initialData ? 'justify-between' : 'justify-end'} gap-3`}>
-             {initialData && onDelete && (
-               <button
-                 onClick={onDelete}
-                 className="flex items-center gap-2 px-3 py-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg font-medium text-xs transition-colors"
-               >
-                 <Trash2 className="w-3.5 h-3.5" />
-                 Delete
-               </button>
-             )}
+        <div className={`px-5 py-3 bg-slate-50 border-t border-slate-100 flex justify-between gap-3`}>
+             <div className="flex items-center gap-2">
+               {initialData && onDelete && (
+                 <button
+                   onClick={onDelete}
+                   className="flex items-center gap-2 px-3 py-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg font-medium text-xs transition-colors"
+                 >
+                   <Trash2 className="w-3.5 h-3.5" />
+                   Delete
+                 </button>
+               )}
+               {onOpenLibrary && !initialData && (
+                 <button
+                   onClick={onOpenLibrary}
+                   className="flex items-center gap-2 px-3 py-2 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg font-medium text-xs transition-colors"
+                 >
+                   <Library className="w-3.5 h-3.5" />
+                   Browse Library
+                 </button>
+               )}
+             </div>
              <button 
                 onClick={handleSave}
                 disabled={!name || !prompt}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { DocumentFile, Column, ExtractionResult, ExtractionCell } from '../types';
-import { FileText, Plus, Loader2, AlertCircle, CheckCircle2, ChevronRight, MoreHorizontal, Trash2 } from './Icons';
+import { FileText, Plus, Loader2, AlertCircle, CheckCircle2, ChevronRight, MoreHorizontal, Trash2, CheckSquare, Square } from './Icons';
 
 interface DataGridProps {
   documents: DocumentFile[];
@@ -16,6 +16,10 @@ interface DataGridProps {
   selectedCell: { docId: string; colId: string } | null;
   onUpload?: (files: DocumentFile[]) => void;
   onDropFiles?: (files: File[]) => void;
+  // Selection props for re-run feature
+  selectedDocIds?: Set<string>;
+  onToggleDocSelection?: (docId: string) => void;
+  onToggleAllDocSelection?: () => void;
 }
 
 export const DataGrid: React.FC<DataGridProps> = ({
@@ -30,7 +34,10 @@ export const DataGrid: React.FC<DataGridProps> = ({
   onDocClick,
   onRemoveDoc,
   selectedCell,
-  onDropFiles
+  onDropFiles,
+  selectedDocIds = new Set(),
+  onToggleDocSelection,
+  onToggleAllDocSelection
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [resizingColId, setResizingColId] = useState<string | null>(null);
@@ -134,8 +141,26 @@ export const DataGrid: React.FC<DataGridProps> = ({
       <table className="w-full text-left border-collapse table-fixed">
         <thead className="bg-white sticky top-0 z-20 shadow-[0_1px_0_0_rgba(0,0,0,0.1)]">
           <tr>
-            {/* Index Column Header - Sticky Left 0 */}
-            <th className="w-12 border-b border-r border-slate-200 bg-white sticky left-0 z-30 shadow-[1px_0_0_0_rgba(0,0,0,0.05)]"></th>
+            {/* Checkbox Column Header - Sticky Left 0 */}
+            <th className="w-12 border-b border-r border-slate-200 bg-white sticky left-0 z-30 shadow-[1px_0_0_0_rgba(0,0,0,0.05)]">
+              {documents.length > 0 && onToggleAllDocSelection && (
+                <button
+                  onClick={onToggleAllDocSelection}
+                  className="w-full h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors"
+                  title={selectedDocIds.size === documents.length ? "Deselect all" : "Select all for re-run"}
+                >
+                  {selectedDocIds.size === documents.length && documents.length > 0 ? (
+                    <CheckSquare className="w-4 h-4 text-indigo-600" />
+                  ) : selectedDocIds.size > 0 ? (
+                    <div className="w-4 h-4 border-2 border-indigo-400 rounded bg-indigo-100 flex items-center justify-center">
+                      <div className="w-2 h-0.5 bg-indigo-600 rounded"></div>
+                    </div>
+                  ) : (
+                    <Square className="w-4 h-4" />
+                  )}
+                </button>
+              )}
+            </th>
             
             {/* Document Name Header - Sticky Left 12 (48px) */}
             <th className="p-3 border-b border-r border-slate-200 font-semibold text-xs text-slate-500 uppercase tracking-wider w-64 bg-white sticky left-12 z-30 shadow-[1px_0_0_0_rgba(0,0,0,0.05)]">
@@ -186,11 +211,28 @@ export const DataGrid: React.FC<DataGridProps> = ({
           </tr>
         </thead>
         <tbody className="text-sm text-slate-700 divide-y divide-slate-200">
-          {documents.map((doc, index) => (
-            <tr key={doc.id} className="group hover:bg-slate-50/80 transition-colors">
-              {/* Index Column Body - Sticky Left 0 */}
-              <td className="border-b border-r border-slate-200 bg-slate-50 text-[10px] text-slate-400 text-center font-mono sticky left-0 z-10 shadow-[1px_0_0_0_rgba(0,0,0,0.05)]">
-                {index + 1}
+          {documents.map((doc, index) => {
+            const isDocSelected = selectedDocIds.has(doc.id);
+            return (
+            <tr key={doc.id} className={`group hover:bg-slate-50/80 transition-colors ${isDocSelected ? 'bg-amber-50/50' : ''}`}>
+              {/* Checkbox Column Body - Sticky Left 0 */}
+              <td className={`border-b border-r border-slate-200 text-center sticky left-0 z-10 shadow-[1px_0_0_0_rgba(0,0,0,0.05)] ${isDocSelected ? 'bg-amber-50' : 'bg-slate-50'}`}>
+                {onToggleDocSelection && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleDocSelection(doc.id);
+                    }}
+                    className="w-full h-full flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors py-3"
+                    title={isDocSelected ? "Deselect for re-run" : "Select for re-run"}
+                  >
+                    {isDocSelected ? (
+                      <CheckSquare className="w-4 h-4 text-amber-600" />
+                    ) : (
+                      <Square className="w-4 h-4" />
+                    )}
+                  </button>
+                )}
               </td>
               
               {/* Document Name Body - Sticky Left 12 */}
@@ -241,7 +283,7 @@ export const DataGrid: React.FC<DataGridProps> = ({
               <td className="border-b border-slate-200"></td>
               <td className="border-b border-slate-200"></td>
             </tr>
-          ))}
+          )})}
            {/* Empty State / Ghost Rows to keep grid structure */}
            {Array.from({ length: Math.max(5, 20 - documents.length) }).map((_, i) => (
             <tr key={`empty-${i}`}>

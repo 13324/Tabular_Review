@@ -3,11 +3,13 @@ import { DataGrid } from './components/DataGrid';
 import { VerificationSidebar } from './components/VerificationSidebar';
 import { ChatInterface } from './components/ChatInterface';
 import { AddColumnMenu } from './components/AddColumnMenu';
+import { ColumnLibrary } from './components/ColumnLibrary';
 import { extractColumnData } from './services/geminiService';
 import { processDocumentToMarkdown } from './services/documentProcessor';
-import { DocumentFile, Column, ExtractionResult, SidebarMode, ColumnType } from './types';
-import { MessageSquare, Table, Square, FilePlus, LayoutTemplate, ChevronDown, Zap, Cpu, Brain, Trash2, Play, Download, WrapText, Loader2 } from './components/Icons';
+import { DocumentFile, Column, ExtractionResult, SidebarMode, ColumnType, SavedProject, ColumnTemplate } from './types';
+import { MessageSquare, Table, Square, FilePlus, LayoutTemplate, ChevronDown, Zap, Cpu, Brain, Trash2, Play, Download, WrapText, Loader2, Save, FolderOpen, RefreshCw } from './components/Icons';
 import { SAMPLE_COLUMNS } from './utils/sampleData';
+import { saveProject, loadProject } from './utils/fileStorage';
 
 // Available Models
 const MODELS = [
@@ -40,6 +42,9 @@ const App: React.FC = () => {
   // Add/Edit Column Menu State
   const [addColumnAnchor, setAddColumnAnchor] = useState<DOMRect | null>(null);
   const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
+  
+  // Column Library State
+  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
 
   // Extraction Control
   const [isProcessing, setIsProcessing] = useState(false);
@@ -50,7 +55,62 @@ const App: React.FC = () => {
   // Text Wrap State
   const [isTextWrapEnabled, setIsTextWrapEnabled] = useState(false);
 
+  // Document Selection State (for re-run)
+  const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
+
   // Handlers
+  
+  // Project Save/Load Handlers
+  const handleSaveProject = async () => {
+    const project: SavedProject = {
+      version: 1,
+      name: projectName,
+      savedAt: new Date().toISOString(),
+      columns: columns,
+      documents: documents,
+      results: results,
+      selectedModel: selectedModel
+    };
+    
+    try {
+      const success = await saveProject(project);
+      if (success) {
+        // Brief visual feedback could be added here
+      }
+    } catch (error) {
+      console.error('Failed to save project:', error);
+      alert('Failed to save project. Please try again.');
+    }
+  };
+
+  const handleLoadProject = async () => {
+    // Warn if there's unsaved work
+    const hasWork = documents.length > 0 || columns.length > 0 || Object.keys(results).length > 0;
+    if (hasWork && !window.confirm('Loading a project will replace your current work. Continue?')) {
+      return;
+    }
+    
+    try {
+      const project = await loadProject();
+      if (project) {
+        setProjectName(project.name);
+        setColumns(project.columns);
+        setDocuments(project.documents);
+        setResults(project.results);
+        if (project.selectedModel) {
+          setSelectedModel(project.selectedModel);
+        }
+        // Reset UI state
+        setSidebarMode('none');
+        setSelectedCell(null);
+        setPreviewDocId(null);
+        setSelectedDocIds(new Set());
+      }
+    } catch (error) {
+      console.error('Failed to load project:', error);
+      alert('Failed to load project. The file may be corrupted or invalid.');
+    }
+  };
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files.length > 0) {
       const fileList: File[] = Array.from(event.target.files);
@@ -214,6 +274,25 @@ const App: React.FC = () => {
     setEditingColumnId(null);
   };
 
+  const handleSelectTemplate = (template: ColumnTemplate) => {
+    // Create a new column from the template
+    const newCol: Column = {
+      id: `col_${Date.now()}`,
+      name: template.name,
+      type: template.type,
+      prompt: template.prompt,
+      status: 'idle',
+      width: 250
+    };
+    setColumns(prev => [...prev, newCol]);
+    setIsLibraryOpen(false);
+  };
+
+  const handleOpenLibrary = () => {
+    setAddColumnAnchor(null);
+    setIsLibraryOpen(true);
+  };
+
   const handleStopExtraction = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -224,6 +303,47 @@ const App: React.FC = () => {
   const handleRunAnalysis = () => {
     if (documents.length === 0 || columns.length === 0) return;
     processExtraction(documents, columns);
+  };
+
+  const handleRerunSelected = () => {
+    if (selectedDocIds.size === 0 || columns.length === 0) return;
+    
+    // Get selected documents
+    const selectedDocs = documents.filter(d => selectedDocIds.has(d.id));
+    
+    // Clear existing results for selected documents
+    setResults(prev => {
+      const next = { ...prev };
+      selectedDocIds.forEach(docId => {
+        delete next[docId];
+      });
+      return next;
+    });
+    
+    // Run extraction on selected documents
+    processExtraction(selectedDocs, columns, true);
+  };
+
+  const handleToggleDocSelection = (docId: string) => {
+    setSelectedDocIds(prev => {
+      const next = new Set(prev);
+      if (next.has(docId)) {
+        next.delete(docId);
+      } else {
+        next.add(docId);
+      }
+      return next;
+    });
+  };
+
+  const handleToggleAllDocSelection = () => {
+    if (selectedDocIds.size === documents.length) {
+      // Deselect all
+      setSelectedDocIds(new Set());
+    } else {
+      // Select all
+      setSelectedDocIds(new Set(documents.map(d => d.id)));
+    }
   };
 
   const handleExportCSV = () => {
@@ -256,7 +376,7 @@ const App: React.FC = () => {
     document.body.removeChild(link);
   };
 
-  const processExtraction = async (docsToProcess: DocumentFile[], colsToProcess: Column[]) => {
+  const processExtraction = async (docsToProcess: DocumentFile[], colsToProcess: Column[], forceOverwrite: boolean = false) => {
     // Cancel any previous run
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -276,8 +396,8 @@ const App: React.FC = () => {
       
       for (const doc of docsToProcess) {
           for (const col of colsToProcess) {
-             // Only add task if result doesn't exist or we want to force overwrite
-             if (!results[doc.id]?.[col.id]) {
+             // Only add task if result doesn't exist or forceOverwrite is true
+             if (forceOverwrite || !results[doc.id]?.[col.id]) {
                  tasks.push({ doc, col });
              }
           }
@@ -478,6 +598,27 @@ const App: React.FC = () => {
                 Load Sample
              </button>
 
+             {/* Save Project Button */}
+             <button 
+                onClick={handleSaveProject}
+                disabled={documents.length === 0 && columns.length === 0}
+                className="flex items-center gap-2 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-xs font-semibold rounded-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Save Project"
+             >
+                <Save className="w-3.5 h-3.5" />
+                Save
+             </button>
+
+             {/* Load Project Button */}
+             <button 
+                onClick={handleLoadProject}
+                className="flex items-center gap-2 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-xs font-semibold rounded-md transition-all active:scale-95"
+                title="Load Project"
+             >
+                <FolderOpen className="w-3.5 h-3.5" />
+                Load
+             </button>
+
              {/* Export Button */}
              <button 
                 onClick={handleExportCSV}
@@ -576,6 +717,16 @@ const App: React.FC = () => {
                   <Square className="w-3.5 h-3.5 fill-current" />
                   Stop
                 </button>
+             ) : selectedDocIds.size > 0 ? (
+                <button 
+                  onClick={handleRerunSelected}
+                  disabled={columns.length === 0}
+                  className="flex items-center gap-2 px-4 py-1.5 bg-amber-500 hover:bg-amber-600 text-white border border-amber-500 text-xs font-bold rounded-md transition-all active:scale-95 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Re-run analysis on selected documents"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                  Re-run ({selectedDocIds.size})
+                </button>
              ) : (
                 <button 
                   onClick={handleRunAnalysis}
@@ -621,6 +772,9 @@ const App: React.FC = () => {
                 selectedCell={selectedCell}
                 isTextWrapEnabled={isTextWrapEnabled}
                 onDropFiles={(files) => processUploadedFiles(files)}
+                selectedDocIds={selectedDocIds}
+                onToggleDocSelection={handleToggleDocSelection}
+                onToggleAllDocSelection={handleToggleAllDocSelection}
              />
           </div>
 
@@ -633,8 +787,16 @@ const App: React.FC = () => {
               onDelete={handleDeleteColumn}
               modelId={selectedModel}
               initialData={editingColumnId ? columns.find(c => c.id === editingColumnId) : undefined}
+              onOpenLibrary={handleOpenLibrary}
             />
           )}
+
+          {/* Column Library Modal */}
+          <ColumnLibrary
+            isOpen={isLibraryOpen}
+            onClose={() => setIsLibraryOpen(false)}
+            onSelectTemplate={handleSelectTemplate}
+          />
 
           {/* Right Sidebar Container (Animated Width) */}
           <div 
