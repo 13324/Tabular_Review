@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { ColumnType, ColumnTemplate } from '../types';
-import { generatePromptHelper } from '../services/geminiService';
+import { ColumnType, ColumnTemplate, Provider } from '../types';
+import { generatePromptHelper as geminiPromptHelper } from '../services/geminiService';
+import { generatePromptHelper as openRouterPromptHelper } from '../services/openRouterService';
 import { addTemplateToLibrary } from '../utils/fileStorage';
 import { 
   X, 
@@ -33,6 +34,7 @@ interface AddColumnMenuProps {
   onSave: (col: { name: string; type: ColumnType; prompt: string }) => void;
   onDelete?: () => void;
   modelId: string;
+  provider: Provider;
   initialData?: { name: string; type: ColumnType; prompt: string };
   onOpenLibrary?: () => void;
 }
@@ -43,6 +45,7 @@ export const AddColumnMenu: React.FC<AddColumnMenuProps> = ({
   onSave,
   onDelete,
   modelId,
+  provider,
   initialData,
   onOpenLibrary
 }) => {
@@ -75,7 +78,8 @@ export const AddColumnMenu: React.FC<AddColumnMenuProps> = ({
     
     setIsGeneratingPrompt(true);
     try {
-      const suggestion = await generatePromptHelper(name, type, prompt || undefined, modelId);
+      const promptFn = provider === 'openrouter' ? openRouterPromptHelper : geminiPromptHelper;
+      const suggestion = await promptFn(name, type, prompt || undefined, modelId);
       setPrompt(suggestion);
     } catch (e) {
       console.error("Failed to generate prompt", e);

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bot, Send, X, User } from 'lucide-react';
-import { ChatMessage, DocumentFile, Column, ExtractionResult } from '../types';
-import { analyzeDataWithChat } from '../services/geminiService';
+import { ChatMessage, DocumentFile, Column, ExtractionResult, Provider } from '../types';
+import { analyzeDataWithChat as geminiChat } from '../services/geminiService';
+import { analyzeDataWithChat as openRouterChat } from '../services/openRouterService';
 
 interface ChatInterfaceProps {
   documents: DocumentFile[];
@@ -9,6 +10,7 @@ interface ChatInterfaceProps {
   results: ExtractionResult;
   onClose: () => void;
   modelId: string;
+  provider: Provider;
 }
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -16,7 +18,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   columns,
   results,
   onClose,
-  modelId
+  modelId,
+  provider
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -52,7 +55,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         parts: [{ text: m.text }]
       }));
 
-      const responseText = await analyzeDataWithChat(
+      const chatFn = provider === 'openrouter' ? openRouterChat : geminiChat;
+      const responseText = await chatFn(
         input,
         { documents, columns, results },
         history,

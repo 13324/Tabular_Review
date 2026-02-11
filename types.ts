@@ -41,6 +41,7 @@ export interface ChatMessage {
   timestamp: number;
 }
 
+export type Provider = 'gemini' | 'openrouter';
 export type ViewMode = 'grid' | 'chat';
 export type SidebarMode = 'none' | 'verify' | 'chat';
 
@@ -53,6 +54,7 @@ export interface SavedProject {
   documents: DocumentFile[];
   results: ExtractionResult;
   selectedModel: string;
+  selectedProvider?: Provider;
 }
 
 // Column template library types

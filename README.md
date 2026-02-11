@@ -4,12 +4,13 @@
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![React](https://img.shields.io/badge/framework-React-61DAFB.svg)
 ![AI](https://img.shields.io/badge/AI-Google%20Gemini-8E75B2.svg)
+![AI](https://img.shields.io/badge/AI-OpenRouter-FF6600.svg)
 
 An AI-powered document review workspace that transforms unstructured legal contracts into structured, queryable datasets. Designed for legal professionals, auditors, and procurement teams to accelerate due diligence and contract analysis.
 
 ## 🚀 Features
 
-- **AI-Powered Extraction**: Automatically extract key clauses, dates, amounts, and entities from PDFs using Google Gemini 2.5 Pro / 3.0.
+- **AI-Powered Extraction**: Automatically extract key clauses, dates, amounts, and entities from PDFs using Google Gemini or open-source models via OpenRouter (DeepSeek, Qwen, Llama, GPT-OSS).
 - **High-Fidelity Conversion**: Uses **Docling** (running locally) to convert PDFs and DOCX files to clean Markdown text, preserving formatting and structure without hallucination.
 - **Dynamic Schema**: Define columns with natural language prompts (e.g., "What is the governing law?").
 - **Verification & Citations**: Click any extracted cell to view the exact source quote highlighted in the original document.
@@ -23,7 +24,7 @@ https://github.com/user-attachments/assets/b63026d8-3df6-48a8-bb4b-eb8f24d3a1ca
 ## 🛠 Tech Stack
 
 - **Frontend**: React 19, TypeScript, Tailwind CSS
-- **AI Integration**: Google GenAI SDK (Gemini 2.5 Flash, 2.5 Pro, 3.0 Pro)
+- **AI Integration**: Google GenAI SDK (Gemini 2.5 Flash, 2.5 Pro, 3.0 Pro) + OpenRouter API (DeepSeek R1/V3, Qwen 2.5 72B, Llama 3.3 70B, GPT-OSS 120B)
 
 ## 📦 Getting Started
 
@@ -39,9 +40,10 @@ Install Node dependencies:
 pnpm install
 ```
 
-Create a `.env.local` file in the root directory for your Google API Key:
+Create a `.env` file in the root directory (copy from `.env.example`):
 ```env
 VITE_GEMINI_API_KEY=your_google_api_key_here
+VITE_OPENROUTER_API_KEY=your_openrouter_api_key_here  # optional
 ```
 
 ### 3. Setup Backend (Docling)

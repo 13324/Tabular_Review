@@ -4,19 +4,47 @@ import { VerificationSidebar } from './components/VerificationSidebar';
 import { ChatInterface } from './components/ChatInterface';
 import { AddColumnMenu } from './components/AddColumnMenu';
 import { ColumnLibrary } from './components/ColumnLibrary';
-import { extractColumnData } from './services/geminiService';
+import { extractColumnData as geminiExtract } from './services/geminiService';
+import { extractColumnData as openRouterExtract } from './services/openRouterService';
 import { processDocumentToMarkdown } from './services/documentProcessor';
-import { DocumentFile, Column, ExtractionResult, SidebarMode, ColumnType, SavedProject, ColumnTemplate } from './types';
+import { DocumentFile, Column, ExtractionResult, SidebarMode, ColumnType, SavedProject, ColumnTemplate, Provider } from './types';
 import { MessageSquare, Table, Square, FilePlus, LayoutTemplate, ChevronDown, Zap, Cpu, Brain, Trash2, Play, Download, WrapText, Loader2, Save, FolderOpen, RefreshCw } from './components/Icons';
 import { SAMPLE_COLUMNS } from './utils/sampleData';
 import { saveProject, loadProject } from './utils/fileStorage';
 
-// Available Models
-const MODELS = [
-  { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro', description: 'Deepest Reasoning', icon: Brain },
-  { id: 'gemini-2.5-pro-preview', name: 'Gemini 2.5 Pro', description: 'Balanced', icon: Cpu },
-  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: 'Fastest', icon: Zap },
+// Available Models grouped by provider
+interface ModelEntry {
+  id: string;
+  name: string;
+  description: string;
+  icon: React.FC<any>;
+  provider: Provider;
+}
+
+const PROVIDER_MODELS: { provider: Provider; label: string; models: ModelEntry[] }[] = [
+  {
+    provider: 'gemini',
+    label: 'Google Gemini',
+    models: [
+      { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro', description: 'Deepest Reasoning', icon: Brain, provider: 'gemini' },
+      { id: 'gemini-2.5-pro-preview', name: 'Gemini 2.5 Pro', description: 'Balanced', icon: Cpu, provider: 'gemini' },
+      { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: 'Fastest', icon: Zap, provider: 'gemini' },
+    ],
+  },
+  {
+    provider: 'openrouter',
+    label: 'OpenRouter',
+    models: [
+      { id: 'openai/gpt-oss-120b:free', name: 'GPT-OSS 120B', description: 'Free', icon: Zap, provider: 'openrouter' },
+      { id: 'deepseek/deepseek-r1', name: 'DeepSeek R1 671B', description: 'Reasoning', icon: Brain, provider: 'openrouter' },
+      { id: 'deepseek/deepseek-chat', name: 'DeepSeek V3 671B', description: 'Balanced', icon: Cpu, provider: 'openrouter' },
+      { id: 'qwen/qwen-2.5-72b-instruct', name: 'Qwen 2.5 72B', description: 'Fast', icon: Zap, provider: 'openrouter' },
+      { id: 'meta-llama/llama-3.3-70b-instruct', name: 'Llama 3.3 70B', description: 'Open Source', icon: Cpu, provider: 'openrouter' },
+    ],
+  },
 ];
+
+const ALL_MODELS = PROVIDER_MODELS.flatMap(g => g.models);
 
 const App: React.FC = () => {
   // State
@@ -36,7 +64,8 @@ const App: React.FC = () => {
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   
   // Model State
-  const [selectedModel, setSelectedModel] = useState<string>(MODELS[0].id);
+  const [selectedProvider, setSelectedProvider] = useState<Provider>('gemini');
+  const [selectedModel, setSelectedModel] = useState<string>(PROVIDER_MODELS[0].models[0].id);
   const [isModelMenuOpen, setIsModelMenuOpen] = useState(false);
 
   // Add/Edit Column Menu State
@@ -69,9 +98,10 @@ const App: React.FC = () => {
       columns: columns,
       documents: documents,
       results: results,
-      selectedModel: selectedModel
+      selectedModel: selectedModel,
+      selectedProvider: selectedProvider
     };
-    
+
     try {
       const success = await saveProject(project);
       if (success) {
@@ -100,6 +130,7 @@ const App: React.FC = () => {
         if (project.selectedModel) {
           setSelectedModel(project.selectedModel);
         }
+        setSelectedProvider(project.selectedProvider || 'gemini');
         // Reset UI state
         setSidebarMode('none');
         setSelectedCell(null);
@@ -408,7 +439,8 @@ const App: React.FC = () => {
       const promises = tasks.map(async ({ doc, col }) => {
           if (controller.signal.aborted) return;
           try {
-              const data = await extractColumnData(doc, col, selectedModel);
+              const extractFn = selectedProvider === 'openrouter' ? openRouterExtract : geminiExtract;
+              const data = await extractFn(doc, col, selectedModel);
               if (controller.signal.aborted) return;
 
               setResults(prev => ({
@@ -508,7 +540,7 @@ const App: React.FC = () => {
   };
 
   const sidebarData = getSidebarData();
-  const currentModel = MODELS.find(m => m.id === selectedModel) || MODELS[0];
+  const currentModel = ALL_MODELS.find(m => m.id === selectedModel) || ALL_MODELS[0];
 
   // Calculate Sidebar Width
   const getSidebarWidthClass = () => {
@@ -682,26 +714,34 @@ const App: React.FC = () => {
                 {isModelMenuOpen && (
                   <>
                   <div className="fixed inset-0 z-40" onClick={() => setIsModelMenuOpen(false)}></div>
-                  <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-100 p-1 z-50 animate-in fade-in zoom-in-95 duration-100">
-                    {MODELS.map(model => (
-                      <button
-                        key={model.id}
-                        onClick={() => {
-                          setSelectedModel(model.id);
-                          setIsModelMenuOpen(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 transition-colors ${
-                          selectedModel === model.id ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-700'
-                        }`}
-                      >
-                        <div className={`p-1.5 rounded-md ${selectedModel === model.id ? 'bg-white shadow-sm' : 'bg-slate-100'}`}>
-                          <model.icon className="w-4 h-4" />
+                  <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-100 p-1 z-50 animate-in fade-in zoom-in-95 duration-100 max-h-[400px] overflow-y-auto">
+                    {PROVIDER_MODELS.map(group => (
+                      <div key={group.provider}>
+                        <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                          {group.label}
                         </div>
-                        <div>
-                          <div className="text-xs font-bold">{model.name}</div>
-                          <div className="text-[10px] opacity-70">{model.description}</div>
-                        </div>
-                      </button>
+                        {group.models.map(model => (
+                          <button
+                            key={model.id}
+                            onClick={() => {
+                              setSelectedModel(model.id);
+                              setSelectedProvider(model.provider);
+                              setIsModelMenuOpen(false);
+                            }}
+                            className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 transition-colors ${
+                              selectedModel === model.id ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 text-slate-700'
+                            }`}
+                          >
+                            <div className={`p-1.5 rounded-md ${selectedModel === model.id ? 'bg-white shadow-sm' : 'bg-slate-100'}`}>
+                              <model.icon className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <div className="text-xs font-bold">{model.name}</div>
+                              <div className="text-[10px] opacity-70">{model.description}</div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
                     ))}
                   </div>
                   </>
@@ -780,12 +820,13 @@ const App: React.FC = () => {
 
           {/* Add/Edit Column Menu */}
           {addColumnAnchor && (
-            <AddColumnMenu 
+            <AddColumnMenu
               triggerRect={addColumnAnchor}
               onClose={handleCloseMenu}
               onSave={handleSaveColumn}
               onDelete={handleDeleteColumn}
               modelId={selectedModel}
+              provider={selectedProvider}
               initialData={editingColumnId ? columns.find(c => c.id === editingColumnId) : undefined}
               onOpenLibrary={handleOpenLibrary}
             />
@@ -815,12 +856,13 @@ const App: React.FC = () => {
                     />
                 )}
                 {sidebarMode === 'chat' && (
-                    <ChatInterface 
+                    <ChatInterface
                         documents={documents}
                         columns={columns}
                         results={results}
                         onClose={() => setSidebarMode('none')}
                         modelId={selectedModel}
+                        provider={selectedProvider}
                     />
                 )}
             </div>
