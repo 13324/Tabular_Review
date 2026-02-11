@@ -29,7 +29,7 @@ https://github.com/user-attachments/assets/b63026d8-3df6-48a8-bb4b-eb8f24d3a1ca
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/yourusername/tabular-review.git
+git clone https://github.com/jamietso/tabular-review.git
 cd tabular-review
 ```
 
