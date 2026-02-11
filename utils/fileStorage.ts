@@ -28,45 +28,54 @@ export const saveProject = async (project: SavedProject): Promise<boolean> => {
 };
 
 export const loadProject = async (): Promise<SavedProject | null> => {
-  // Always use file input - it's more reliable across browsers
-  return new Promise((resolve, reject) => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    
-    input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
+  // Create and append input to DOM — some browsers require this for click() to work
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json,.tabular-project.json';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+
+  return new Promise<SavedProject | null>((resolve, reject) => {
+    let settled = false;
+
+    const cleanup = () => {
+      if (input.parentNode) input.parentNode.removeChild(input);
+    };
+
+    input.addEventListener('change', async () => {
+      const file = input.files?.[0];
       if (!file) {
-        resolve(null);
+        if (!settled) { settled = true; cleanup(); resolve(null); }
         return;
       }
-      
+
       try {
         const text = await file.text();
         const project = JSON.parse(text) as SavedProject;
-        
+
         if (!validateProject(project)) {
           throw new Error('Invalid project file structure');
         }
-        
-        resolve(project);
+
+        if (!settled) { settled = true; cleanup(); resolve(project); }
       } catch (err: any) {
         console.error('Load project error:', err);
-        reject(new Error(`Failed to load: ${err.message}`));
+        if (!settled) { settled = true; cleanup(); reject(new Error(`Failed to load: ${err.message}`)); }
       }
-    };
-    
-    // Handle cancel - use a timeout since oncancel isn't reliable
-    const handleFocus = () => {
+    });
+
+    // Fallback for cancel: detect when window regains focus without a file selected
+    window.addEventListener('focus', function onFocus() {
       setTimeout(() => {
-        if (!input.files?.length) {
+        window.removeEventListener('focus', onFocus);
+        if (!settled && (!input.files || input.files.length === 0)) {
+          settled = true;
+          cleanup();
           resolve(null);
         }
-        window.removeEventListener('focus', handleFocus);
-      }, 300);
-    };
-    window.addEventListener('focus', handleFocus);
-    
+      }, 500);
+    });
+
     input.click();
   });
 };

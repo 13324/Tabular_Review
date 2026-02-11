@@ -5,6 +5,22 @@ export interface DocumentFile {
   size: number;
   content: string; // Base64 string for PDF/Images, or raw text for TXT
   mimeType: string;
+  docId?: string;   // Backend OCR document ID (for visual grounding)
+  hasOcr?: boolean;  // Whether OCR data is available on backend
+}
+
+// Visual grounding / OCR types
+export type BBox = [[number, number], [number, number], [number, number], [number, number]];
+
+export interface OCRTextRegion {
+  bbox: BBox;
+  text: string;
+  confidence: number;
+}
+
+export interface PageOCRData {
+  page: number;
+  regions: OCRTextRegion[];
 }
 
 export type ColumnType = 'text' | 'number' | 'date' | 'boolean' | 'list';

@@ -113,16 +113,44 @@ const App: React.FC = () => {
     }
   };
 
-  const handleLoadProject = async () => {
-    // Warn if there's unsaved work
-    const hasWork = documents.length > 0 || columns.length > 0 || Object.keys(results).length > 0;
-    if (hasWork && !window.confirm('Loading a project will replace your current work. Continue?')) {
-      return;
-    }
-    
-    try {
-      const project = await loadProject();
-      if (project) {
+  const handleLoadProject = () => {
+    // Reuse the existing file input (which is already in the DOM and works)
+    // Temporarily reconfigure it for project loading
+    const input = fileInputRef.current;
+    if (!input) return;
+
+    // Save original config
+    const origAccept = input.accept;
+    const origMultiple = input.multiple;
+    const origOnChange = input.onchange;
+
+    // Reconfigure for project file
+    input.accept = '.json';
+    input.multiple = false;
+
+    input.onchange = async (e: Event) => {
+      // Restore original config immediately
+      input.accept = origAccept;
+      input.multiple = origMultiple;
+      input.onchange = origOnChange;
+
+      const file = (e.target as HTMLInputElement).files?.[0];
+      input.value = '';
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const project = JSON.parse(text) as SavedProject;
+
+        if (!project || !project.name || !Array.isArray(project.columns) || !Array.isArray(project.documents)) {
+          throw new Error('Invalid project file');
+        }
+
+        const hasWork = documents.length > 0 || columns.length > 0 || Object.keys(results).length > 0;
+        if (hasWork && !window.confirm('Loading a project will replace your current work. Continue?')) {
+          return;
+        }
+
         setProjectName(project.name);
         setColumns(project.columns);
         setDocuments(project.documents);
@@ -131,16 +159,17 @@ const App: React.FC = () => {
           setSelectedModel(project.selectedModel);
         }
         setSelectedProvider(project.selectedProvider || 'gemini');
-        // Reset UI state
         setSidebarMode('none');
         setSelectedCell(null);
         setPreviewDocId(null);
         setSelectedDocIds(new Set());
+      } catch (error) {
+        console.error('Failed to load project:', error);
+        alert('Failed to load project. The file may be corrupted or invalid.');
       }
-    } catch (error) {
-      console.error('Failed to load project:', error);
-      alert('Failed to load project. The file may be corrupted or invalid.');
-    }
+    };
+
+    input.click();
   };
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files.length > 0) {
@@ -158,11 +187,11 @@ const App: React.FC = () => {
 
         for (const file of fileList) {
           // Use local deterministic processor (markitdown style)
-          const markdownContent = await processDocumentToMarkdown(file);
-          
+          const result = await processDocumentToMarkdown(file);
+
           // Encode to Base64 to match our storage format (mimicking the sample data structure)
           // This keeps the rest of the app (which expects base64 strings for "content") happy
-          const contentBase64 = btoa(unescape(encodeURIComponent(markdownContent)));
+          const contentBase64 = btoa(unescape(encodeURIComponent(result.markdown)));
 
           processedFiles.push({
             id: Math.random().toString(36).substring(2, 9),
@@ -170,7 +199,9 @@ const App: React.FC = () => {
             type: file.type,
             size: file.size,
             content: contentBase64,
-            mimeType: 'text/markdown' // Force to markdown so the viewer treats it as text
+            mimeType: 'text/markdown', // Force to markdown so the viewer treats it as text
+            docId: result.docId,
+            hasOcr: result.hasOcr,
           });
         }
 
@@ -556,9 +587,9 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-slate-50 text-slate-900 font-sans">
-      {/* Hidden File Input */}
-      <input 
-        type="file" 
+      {/* Hidden File Inputs */}
+      <input
+        type="file"
         ref={fileInputRef}
         onChange={handleFileUpload}
         multiple

@@ -41,17 +41,22 @@ import {
   FolderOpen,
   Library,
   RotateCcw,
-  RefreshCw
+  RefreshCw,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  Move,
+  ChevronUp
 } from 'lucide-react';
 
-export { 
-  Plus, 
-  Upload, 
-  FileText, 
-  MessageSquare, 
-  X, 
+export {
+  Plus,
+  Upload,
+  FileText,
+  MessageSquare,
+  X,
   ChevronRight,
-  ChevronLeft, 
+  ChevronLeft,
   Loader2,
   Search,
   CheckCircle2,
@@ -86,5 +91,10 @@ export {
   FolderOpen,
   Library,
   RotateCcw,
-  RefreshCw
+  RefreshCw,
+  ZoomIn,
+  ZoomOut,
+  Maximize2,
+  Move,
+  ChevronUp
 };

@@ -25,3 +25,4 @@ dist-ssr
 *.env
 venv/
 server/venv/
+server/ocr_data/

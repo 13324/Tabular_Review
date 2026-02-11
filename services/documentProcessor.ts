@@ -1,6 +1,12 @@
 
 
-export const processDocumentToMarkdown = async (file: File): Promise<string> => {
+export interface ConvertResult {
+  markdown: string;
+  docId?: string;
+  hasOcr?: boolean;
+}
+
+export const processDocumentToMarkdown = async (file: File): Promise<ConvertResult> => {
   try {
     const formData = new FormData();
     formData.append('file', file);
@@ -17,11 +23,14 @@ export const processDocumentToMarkdown = async (file: File): Promise<string> => 
     }
 
     const data = await response.json();
-    return data.markdown || "";
+    return {
+      markdown: data.markdown || "",
+      docId: data.doc_id || undefined,
+      hasOcr: data.has_ocr || false,
+    };
 
   } catch (error) {
     console.error("Document Conversion failed:", error);
     throw new Error(`Failed to convert ${file.name}. Is the backend server running?`);
   }
 };
-
