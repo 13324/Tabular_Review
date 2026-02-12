@@ -21,17 +21,23 @@ async function withRetry<T>(operation: () => Promise<T>, retries = 5, initialDel
       currentTry++;
       
       // Check for Rate Limit / Quota errors
-      const isRateLimit = 
-        error?.status === 429 || 
+      const isRateLimit =
+        error?.status === 429 ||
         error?.code === 429 ||
-        error?.message?.includes('429') || 
+        error?.message?.includes('429') ||
         error?.message?.includes('RESOURCE_EXHAUSTED') ||
         error?.message?.includes('quota');
+      const isNetworkError =
+        error instanceof TypeError ||
+        error?.message?.includes('Failed to fetch') ||
+        error?.message?.includes('NetworkError') ||
+        error?.status === 502 ||
+        error?.status === 503;
 
-      if (isRateLimit && currentTry <= retries) {
-        // Exponential backoff with jitter to prevent thundering herd
+      if ((isRateLimit || isNetworkError) && currentTry <= retries) {
         const delay = initialDelay * Math.pow(2, currentTry - 1) + (Math.random() * 1000);
-        console.warn(`Gemini API Rate Limit hit. Retrying attempt ${currentTry} in ${delay.toFixed(0)}ms...`);
+        const reason = isRateLimit ? 'Rate limit' : 'Network error';
+        console.warn(`Gemini API ${reason}. Retrying attempt ${currentTry}/${retries} in ${delay.toFixed(0)}ms...`);
         await wait(delay);
         continue;
       }

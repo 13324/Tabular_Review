@@ -7,6 +7,7 @@ export interface DocumentFile {
   mimeType: string;
   docId?: string;   // Backend OCR document ID (for visual grounding)
   hasOcr?: boolean;  // Whether OCR data is available on backend
+  converting?: boolean; // True while backend conversion is in progress
 }
 
 // Visual grounding / OCR types
@@ -86,4 +87,13 @@ export interface ColumnTemplate {
 export interface ColumnLibrary {
   version: 1;
   templates: ColumnTemplate[];
+}
+
+export interface Playbook {
+  id: string;
+  name: string;
+  description: string;
+  columns: { name: string; type: ColumnType; prompt: string }[];
+  createdAt: string;
+  builtIn?: boolean;
 }

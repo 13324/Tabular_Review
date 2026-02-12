@@ -213,10 +213,11 @@ export const DataGrid: React.FC<DataGridProps> = ({
         <tbody className="text-sm text-slate-700 divide-y divide-slate-200">
           {documents.map((doc, index) => {
             const isDocSelected = selectedDocIds.has(doc.id);
+            const isConverting = doc.converting === true;
             return (
-            <tr key={doc.id} className={`group hover:bg-slate-50/80 transition-colors ${isDocSelected ? 'bg-amber-50/50' : ''}`}>
+            <tr key={doc.id} className={`group hover:bg-slate-50/80 transition-colors ${isConverting ? 'bg-indigo-50/40' : isDocSelected ? 'bg-amber-50/50' : ''}`}>
               {/* Checkbox Column Body - Sticky Left 0 */}
-              <td className={`border-b border-r border-slate-200 text-center sticky left-0 z-10 shadow-[1px_0_0_0_rgba(0,0,0,0.05)] ${isDocSelected ? 'bg-amber-50' : 'bg-slate-50'}`}>
+              <td className={`border-b border-r border-slate-200 text-center sticky left-0 z-10 shadow-[1px_0_0_0_rgba(0,0,0,0.05)] ${isConverting ? 'bg-indigo-50/40' : isDocSelected ? 'bg-amber-50' : 'bg-slate-50'}`}>
                 {onToggleDocSelection && (
                   <button
                     onClick={(e) => {
@@ -236,18 +237,20 @@ export const DataGrid: React.FC<DataGridProps> = ({
               </td>
               
               {/* Document Name Body - Sticky Left 12 */}
-              <td 
-                className="p-3 border-b border-r border-slate-200 font-medium text-slate-900 bg-white group-hover:bg-slate-50 transition-colors sticky left-12 z-10 w-64 truncate shadow-[1px_0_0_0_rgba(0,0,0,0.05)] cursor-pointer hover:text-indigo-600 relative"
-                onClick={() => onDocClick(doc.id)}
-                title="Click to preview document"
+              <td
+                className={`p-3 border-b border-r border-slate-200 font-medium transition-colors sticky left-12 z-10 w-64 truncate shadow-[1px_0_0_0_rgba(0,0,0,0.05)] relative ${isConverting ? 'bg-indigo-50/40 text-slate-500' : 'text-slate-900 bg-white group-hover:bg-slate-50 cursor-pointer hover:text-indigo-600'}`}
+                onClick={() => !isConverting && onDocClick(doc.id)}
+                title={isConverting ? "Converting..." : "Click to preview document"}
               >
                 <div className="flex items-center gap-3 group/docname">
-                    <div className="p-1.5 bg-slate-100 rounded text-slate-500">
-                        <FileText className="w-3 h-3" />
+                    <div className={`p-1.5 rounded ${isConverting ? 'bg-indigo-100 text-indigo-500' : 'bg-slate-100 text-slate-500'}`}>
+                        {isConverting ? <Loader2 className="w-3 h-3 animate-spin" /> : <FileText className="w-3 h-3" />}
                     </div>
                     <div className="flex-1 truncate pr-6">
                         <span title={doc.name}>{doc.name}</span>
-                        <div className="text-[10px] text-slate-400 font-normal uppercase mt-0.5">{doc.size > 1024 ? `${(doc.size/1024).toFixed(0)} KB` : `${doc.size} B`}</div>
+                        <div className="text-[10px] text-slate-400 font-normal uppercase mt-0.5">
+                          {isConverting ? <span className="text-indigo-400">Converting…</span> : doc.size > 1024 ? `${(doc.size/1024).toFixed(0)} KB` : `${doc.size} B`}
+                        </div>
                     </div>
 
                     {/* Delete Button - Visible on Hover */}
@@ -268,15 +271,15 @@ export const DataGrid: React.FC<DataGridProps> = ({
               {columns.map((col) => {
                 const isSelected = selectedCell?.docId === doc.id && selectedCell?.colId === col.id;
                 return (
-                    <td 
-                    key={`${doc.id}-${col.id}`} 
-                    className={`p-3 border-b border-r border-slate-200 cursor-pointer transition-colors ${isTextWrapEnabled ? 'align-top' : 'h-14'}
-                        ${isSelected ? 'bg-indigo-50/60 ring-inset ring-2 ring-indigo-500 z-10' : 'hover:bg-slate-100/50'}
+                    <td
+                    key={`${doc.id}-${col.id}`}
+                    className={`p-3 border-b border-r border-slate-200 transition-colors ${isTextWrapEnabled ? 'align-top' : 'h-14'}
+                        ${isConverting ? 'bg-indigo-50/20' : isSelected ? 'bg-indigo-50/60 ring-inset ring-2 ring-indigo-500 z-10 cursor-pointer' : 'hover:bg-slate-100/50 cursor-pointer'}
                     `}
-                    onClick={() => onCellClick(doc.id, col.id)}
+                    onClick={() => !isConverting && onCellClick(doc.id, col.id)}
                     style={{ width: col.width || 240 }}
                     >
-                    {getCellContent(doc.id, col.id)}
+                    {isConverting ? null : getCellContent(doc.id, col.id)}
                     </td>
                 );
               })}

@@ -46,7 +46,8 @@ import {
   ZoomOut,
   Maximize2,
   Move,
-  ChevronUp
+  ChevronUp,
+  BookOpen
 } from 'lucide-react';
 
 export {
@@ -96,5 +97,6 @@ export {
   ZoomOut,
   Maximize2,
   Move,
-  ChevronUp
+  ChevronUp,
+  BookOpen
 };

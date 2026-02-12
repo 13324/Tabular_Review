@@ -4,13 +4,13 @@ import { VerificationSidebar } from './components/VerificationSidebar';
 import { ChatInterface } from './components/ChatInterface';
 import { AddColumnMenu } from './components/AddColumnMenu';
 import { ColumnLibrary } from './components/ColumnLibrary';
+import { PlaybookLibrary } from './components/PlaybookLibrary';
 import { extractColumnData as geminiExtract } from './services/geminiService';
 import { extractColumnData as openRouterExtract } from './services/openRouterService';
 import { extractColumnData as scalewayExtract } from './services/scalewayService';
 import { processDocumentToMarkdown } from './services/documentProcessor';
-import { DocumentFile, Column, ExtractionResult, SidebarMode, ColumnType, SavedProject, ColumnTemplate, Provider } from './types';
-import { MessageSquare, Table, Square, FilePlus, LayoutTemplate, ChevronDown, Zap, Cpu, Brain, Trash2, Play, Download, WrapText, Loader2, Save, FolderOpen, RefreshCw } from './components/Icons';
-import { SAMPLE_COLUMNS } from './utils/sampleData';
+import { DocumentFile, Column, ExtractionResult, SidebarMode, ColumnType, SavedProject, ColumnTemplate, Provider, Playbook } from './types';
+import { MessageSquare, Table, Square, FilePlus, ChevronDown, Zap, Cpu, Brain, Trash2, Play, Download, WrapText, Save, FolderOpen, RefreshCw, BookOpen } from './components/Icons';
 import { saveProject, loadProject } from './utils/fileStorage';
 
 // Available Models grouped by provider
@@ -87,10 +87,10 @@ const App: React.FC = () => {
   
   // Column Library State
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
+  const [isPlaybookLibraryOpen, setIsPlaybookLibraryOpen] = useState(false);
 
   // Extraction Control
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isConverting, setIsConverting] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -109,7 +109,7 @@ const App: React.FC = () => {
       name: projectName,
       savedAt: new Date().toISOString(),
       columns: columns,
-      documents: documents,
+      documents: documents.filter(d => !d.converting),
       results: results,
       selectedModel: selectedModel,
       selectedProvider: selectedProvider
@@ -194,49 +194,61 @@ const App: React.FC = () => {
   };
 
   const processUploadedFiles = async (fileList: File[]) => {
-    setIsConverting(true);
-    try {
-        const processedFiles: DocumentFile[] = [];
+    // Immediately add placeholder documents so they appear in the grid
+    const placeholders: DocumentFile[] = fileList.map(file => ({
+      id: Math.random().toString(36).substring(2, 9),
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      content: '',
+      mimeType: file.type,
+      converting: true,
+    }));
 
-        for (const file of fileList) {
-          // Use local deterministic processor (markitdown style)
-          const result = await processDocumentToMarkdown(file);
+    setDocuments(prev => [...prev, ...placeholders]);
 
-          // Encode to Base64 to match our storage format (mimicking the sample data structure)
-          // This keeps the rest of the app (which expects base64 strings for "content") happy
-          const contentBase64 = btoa(unescape(encodeURIComponent(result.markdown)));
+    // Convert each file in the background, updating the document in-place when done
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      const placeholderId = placeholders[i].id;
 
-          processedFiles.push({
-            id: Math.random().toString(36).substring(2, 9),
-            name: file.name,
-            type: file.type,
-            size: file.size,
-            content: contentBase64,
-            mimeType: 'text/markdown', // Force to markdown so the viewer treats it as text
-            docId: result.docId,
-            hasOcr: result.hasOcr,
-          });
-        }
+      try {
+        const result = await processDocumentToMarkdown(file);
+        const contentBase64 = btoa(unescape(encodeURIComponent(result.markdown)));
 
-        setDocuments(prev => [...prev, ...processedFiles]);
-    } catch (error) {
-        console.error("Failed to process files:", error);
-        alert("Error processing some files. Please check if they are valid PDF or DOCX documents.");
-    } finally {
-        setIsConverting(false);
+        setDocuments(prev => prev.map(doc =>
+          doc.id === placeholderId
+            ? { ...doc, content: contentBase64, mimeType: 'text/markdown', docId: result.docId, hasOcr: result.hasOcr, converting: false }
+            : doc
+        ));
+      } catch (error) {
+        console.error(`Failed to convert ${file.name}:`, error);
+        // Mark as failed by removing converting flag but leaving content empty
+        setDocuments(prev => prev.map(doc =>
+          doc.id === placeholderId
+            ? { ...doc, converting: false, content: '' }
+            : doc
+        ));
+      }
     }
   };
 
-  const handleLoadSample = () => {
-    const sampleCols = SAMPLE_COLUMNS;
-
-    // setDocuments([]); // Keep existing documents
-    setColumns(sampleCols);
-    setResults({}); // Reset results as columns have changed
+  const handleLoadPlaybook = (playbook: Playbook) => {
+    const newColumns: Column[] = playbook.columns.map((col, i) => ({
+      id: `col_${Date.now()}_${i}`,
+      name: col.name,
+      type: col.type,
+      prompt: col.prompt,
+      status: 'idle' as const,
+      width: 250,
+    }));
+    setColumns(newColumns);
+    setResults({});
     setSidebarMode('none');
-    setProjectName('PE Side Letters Review');
+    setProjectName(playbook.name);
     setPreviewDocId(null);
     setSelectedCell(null);
+    setIsPlaybookLibraryOpen(false);
   };
 
   const handleClearAll = () => {
@@ -452,6 +464,9 @@ const App: React.FC = () => {
   };
 
   const processExtraction = async (docsToProcess: DocumentFile[], colsToProcess: Column[], forceOverwrite: boolean = false) => {
+    // Skip documents still being converted
+    docsToProcess = docsToProcess.filter(d => !d.converting);
+
     // Cancel any previous run
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -478,28 +493,34 @@ const App: React.FC = () => {
           }
       }
 
-      // 2. Process EVERYTHING concurrently (Simultaneous)
-      // Removed batching logic as requested to maximize speed
-      const promises = tasks.map(async ({ doc, col }) => {
+      // 2. Process with bounded concurrency to avoid overwhelming the browser/API
+      const CONCURRENCY = 8;
+      let idx = 0;
+
+      const runNext = async (): Promise<void> => {
+        while (idx < tasks.length) {
           if (controller.signal.aborted) return;
+          const taskIdx = idx++;
+          const { doc, col } = tasks[taskIdx];
           try {
-              const extractFn = selectedProvider === 'scaleway' ? scalewayExtract : selectedProvider === 'openrouter' ? openRouterExtract : geminiExtract;
-              const data = await extractFn(doc, col, selectedModel);
-              if (controller.signal.aborted) return;
+            const extractFn = selectedProvider === 'scaleway' ? scalewayExtract : selectedProvider === 'openrouter' ? openRouterExtract : geminiExtract;
+            const data = await extractFn(doc, col, selectedModel);
+            if (controller.signal.aborted) return;
 
-              setResults(prev => ({
-                  ...prev,
-                  [doc.id]: {
-                      ...(prev[doc.id] || {}),
-                      [col.id]: data
-                  }
-              }));
+            setResults(prev => ({
+              ...prev,
+              [doc.id]: {
+                ...(prev[doc.id] || {}),
+                [col.id]: data
+              }
+            }));
           } catch (e) {
-              console.error(`Failed to extract ${col.name} for ${doc.name}`, e);
+            console.error(`Failed to extract ${col.name} for ${doc.name}`, e);
           }
-      });
+        }
+      };
 
-      await Promise.all(promises);
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, tasks.length) }, () => runNext()));
 
       // Mark all columns as completed if finished successfully without abort
       if (!controller.signal.aborted) {
@@ -664,14 +685,14 @@ const App: React.FC = () => {
                 Clear
              </button>
 
-             {/* Load Sample Button */}
-             <button 
-                onClick={handleLoadSample}
+             {/* Playbooks Button */}
+             <button
+                onClick={() => setIsPlaybookLibraryOpen(true)}
                 className="flex items-center gap-2 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-xs font-semibold rounded-md transition-all active:scale-95"
-                title="Load Sample Columns"
+                title="Open Playbooks"
              >
-                <LayoutTemplate className="w-3.5 h-3.5" />
-                Load Sample
+                <BookOpen className="w-3.5 h-3.5" />
+                Playbooks
              </button>
 
              {/* Save Project Button */}
@@ -720,23 +741,13 @@ const App: React.FC = () => {
              </button>
 
              {/* Add Document Button */}
-             <button 
-                onClick={() => !isConverting && fileInputRef.current?.click()}
-                disabled={isConverting}
-                className={`flex items-center gap-2 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-xs font-semibold rounded-md transition-all active:scale-95 ${isConverting ? 'opacity-70 cursor-wait' : ''}`}
+             <button
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 text-xs font-semibold rounded-md transition-all active:scale-95"
                 title="Add Documents"
              >
-                {isConverting ? (
-                    <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-600" />
-                        <span>Converting...</span>
-                    </>
-                ) : (
-                    <>
-                        <FilePlus className="w-3.5 h-3.5" />
-                        <span>Add Document</span>
-                    </>
-                )}
+                <FilePlus className="w-3.5 h-3.5" />
+                <span>Add Document</span>
              </button>
 
              <div className="h-6 w-px bg-slate-200 mx-1"></div>
@@ -826,21 +837,6 @@ const App: React.FC = () => {
 
         {/* Workspace */}
         <main className="flex-1 flex overflow-hidden relative">
-          {/* Conversion Overlay */}
-          {isConverting && (
-            <div className="absolute inset-0 z-50 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center animate-in fade-in duration-200">
-                <div className="bg-white p-8 rounded-2xl shadow-2xl border border-indigo-100 flex flex-col items-center max-w-md text-center">
-                    <div className="relative mb-6">
-                        <div className="absolute inset-0 bg-indigo-100 rounded-full animate-ping opacity-75"></div>
-                        <div className="relative bg-indigo-50 p-4 rounded-full">
-                            <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
-                        </div>
-                    </div>
-                    <h3 className="text-xl font-bold text-slate-800 mb-2">Converting Documents</h3>
-                    <p className="text-slate-500">Using local Docling engine to preserve formatting and structure...</p>
-                </div>
-            </div>
-          )}
 
           <div className="flex-1 flex flex-col min-w-0 bg-white">
              <DataGrid 
@@ -882,6 +878,15 @@ const App: React.FC = () => {
             onClose={() => setIsLibraryOpen(false)}
             onSelectTemplate={handleSelectTemplate}
           />
+
+          {/* Playbook Library Modal */}
+          {isPlaybookLibraryOpen && (
+            <PlaybookLibrary
+              columns={columns}
+              onLoadPlaybook={handleLoadPlaybook}
+              onClose={() => setIsPlaybookLibraryOpen(false)}
+            />
+          )}
 
           {/* Right Sidebar Container (Animated Width) */}
           <div 

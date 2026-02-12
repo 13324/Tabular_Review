@@ -1,5 +1,36 @@
 # Changelog
 
+## 2026-02-12 — Per-File Conversion Progress
+
+### Improved: Document upload UX
+- Documents now appear immediately in the grid on upload, before conversion completes
+- Each file shows its own converting state: indigo-tinted row, spinning loader icon, "Converting…" subtitle
+- Removed the full-screen "Converting Documents" overlay that blocked the entire UI
+- Clicking on a converting document's name or cells is disabled until conversion finishes
+- Converting documents are automatically excluded from extraction runs and project saves
+- Users can continue reviewing existing documents while new files convert in the background
+
+### Fixed: Extraction failures with many documents/columns
+- Added bounded concurrency (8 parallel requests) to extraction instead of firing all tasks simultaneously
+- Previously, large jobs (e.g. 10 docs × 18 columns = 180 requests) overwhelmed the browser's connection pool, causing `TypeError: Failed to fetch` failures that exhausted retries
+
+## 2026-02-12 — Playbook Feature
+
+### Added: Playbooks — named column presets for common review tasks
+- New `Playbook` interface in `types.ts` (id, name, description, columns, builtIn flag)
+- New persistence functions in `utils/fileStorage.ts`: `loadPlaybooks`, `savePlaybook`, `deletePlaybook` (localStorage-based, same pattern as column library)
+- New `components/PlaybookLibrary.tsx` — full-screen modal with playbook cards, save form, load/delete actions
+- Built-in "PE Side Letter Review" playbook (6 columns from existing sample data)
+- Replaced "Load Sample" toolbar button with "Playbooks" (BookOpen icon) in `App.tsx`
+- Added `BookOpen` icon export to `components/Icons.tsx`
+- Users can save current columns as a new playbook with name + description
+- Users can delete user-created playbooks; built-in playbooks are protected
+- Built-in "Convertible Loan Agreement" playbook (15 columns: title, date, parties, loan amount, disbursement, maturity, interest, lender/company conversion rights, qualified financing threshold, discount, valuation cap, maturity conversion price, subordination)
+
+### Fixed: Network error retry across all LLM providers
+- `withRetry` in `scalewayService.ts`, `geminiService.ts`, `openRouterService.ts` now retries on network errors (`TypeError: Failed to fetch`, 502, 503) in addition to rate limits (429)
+- Previously, transient connection drops during extraction would fail immediately instead of retrying with exponential backoff
+
 ## 2026-02-11 — Scaleway Provider Support
 
 ### Added: Scaleway Generative APIs as third LLM provider
