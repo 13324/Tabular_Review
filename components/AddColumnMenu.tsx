@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ColumnType, ColumnTemplate, Provider } from '../types';
 import { generatePromptHelper as geminiPromptHelper } from '../services/geminiService';
 import { generatePromptHelper as openRouterPromptHelper } from '../services/openRouterService';
+import { generatePromptHelper as scalewayPromptHelper } from '../services/scalewayService';
 import { addTemplateToLibrary } from '../utils/fileStorage';
 import { 
   X, 
@@ -78,7 +79,7 @@ export const AddColumnMenu: React.FC<AddColumnMenuProps> = ({
     
     setIsGeneratingPrompt(true);
     try {
-      const promptFn = provider === 'openrouter' ? openRouterPromptHelper : geminiPromptHelper;
+      const promptFn = provider === 'scaleway' ? scalewayPromptHelper : provider === 'openrouter' ? openRouterPromptHelper : geminiPromptHelper;
       const suggestion = await promptFn(name, type, prompt || undefined, modelId);
       setPrompt(suggestion);
     } catch (e) {

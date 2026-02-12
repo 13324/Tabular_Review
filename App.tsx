@@ -6,6 +6,7 @@ import { AddColumnMenu } from './components/AddColumnMenu';
 import { ColumnLibrary } from './components/ColumnLibrary';
 import { extractColumnData as geminiExtract } from './services/geminiService';
 import { extractColumnData as openRouterExtract } from './services/openRouterService';
+import { extractColumnData as scalewayExtract } from './services/scalewayService';
 import { processDocumentToMarkdown } from './services/documentProcessor';
 import { DocumentFile, Column, ExtractionResult, SidebarMode, ColumnType, SavedProject, ColumnTemplate, Provider } from './types';
 import { MessageSquare, Table, Square, FilePlus, LayoutTemplate, ChevronDown, Zap, Cpu, Brain, Trash2, Play, Download, WrapText, Loader2, Save, FolderOpen, RefreshCw } from './components/Icons';
@@ -29,6 +30,18 @@ const PROVIDER_MODELS: { provider: Provider; label: string; models: ModelEntry[]
       { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro', description: 'Deepest Reasoning', icon: Brain, provider: 'gemini' },
       { id: 'gemini-2.5-pro-preview', name: 'Gemini 2.5 Pro', description: 'Balanced', icon: Cpu, provider: 'gemini' },
       { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: 'Fastest', icon: Zap, provider: 'gemini' },
+    ],
+  },
+  {
+    provider: 'scaleway',
+    label: 'Scaleway (EU)',
+    models: [
+      { id: 'qwen3-235b-a22b-instruct-2507', name: 'Qwen 3 235B', description: 'Deep Reasoning', icon: Brain, provider: 'scaleway' },
+      { id: 'deepseek-r1-distill-llama-70b', name: 'DeepSeek R1 70B', description: 'Reasoning', icon: Brain, provider: 'scaleway' },
+      { id: 'llama-3.3-70b-instruct', name: 'Llama 3.3 70B', description: 'Balanced', icon: Cpu, provider: 'scaleway' },
+      { id: 'mistral-small-3.2-24b-instruct-2506', name: 'Mistral Small 3.2', description: 'Fast + Vision', icon: Zap, provider: 'scaleway' },
+      { id: 'gpt-oss-120b', name: 'GPT-OSS 120B', description: 'Budget', icon: Zap, provider: 'scaleway' },
+      { id: 'qwen3-coder-30b-a3b-instruct', name: 'Qwen 3 Coder 30B', description: 'Code-focused', icon: Cpu, provider: 'scaleway' },
     ],
   },
   {
@@ -470,7 +483,7 @@ const App: React.FC = () => {
       const promises = tasks.map(async ({ doc, col }) => {
           if (controller.signal.aborted) return;
           try {
-              const extractFn = selectedProvider === 'openrouter' ? openRouterExtract : geminiExtract;
+              const extractFn = selectedProvider === 'scaleway' ? scalewayExtract : selectedProvider === 'openrouter' ? openRouterExtract : geminiExtract;
               const data = await extractFn(doc, col, selectedModel);
               if (controller.signal.aborted) return;
 

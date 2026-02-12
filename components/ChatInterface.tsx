@@ -3,6 +3,7 @@ import { Bot, Send, X, User } from 'lucide-react';
 import { ChatMessage, DocumentFile, Column, ExtractionResult, Provider } from '../types';
 import { analyzeDataWithChat as geminiChat } from '../services/geminiService';
 import { analyzeDataWithChat as openRouterChat } from '../services/openRouterService';
+import { analyzeDataWithChat as scalewayChat } from '../services/scalewayService';
 
 interface ChatInterfaceProps {
   documents: DocumentFile[];
@@ -55,7 +56,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         parts: [{ text: m.text }]
       }));
 
-      const chatFn = provider === 'openrouter' ? openRouterChat : geminiChat;
+      const chatFn = provider === 'scaleway' ? scalewayChat : provider === 'openrouter' ? openRouterChat : geminiChat;
       const responseText = await chatFn(
         input,
         { documents, columns, results },

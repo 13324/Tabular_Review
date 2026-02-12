@@ -57,7 +57,7 @@ export interface ChatMessage {
   timestamp: number;
 }
 
-export type Provider = 'gemini' | 'openrouter';
+export type Provider = 'gemini' | 'openrouter' | 'scaleway';
 export type ViewMode = 'grid' | 'chat';
 export type SidebarMode = 'none' | 'verify' | 'chat';
 

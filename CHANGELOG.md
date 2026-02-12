@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-02-11 — Scaleway Provider Support
+
+### Added: Scaleway Generative APIs as third LLM provider
+- Created `services/scalewayService.ts` — OpenAI-compatible API client for Scaleway (extraction, prompt generation, chat)
+  - Exponential-backoff retry on 429 rate limits
+  - Strips `<think>...</think>` tokens from reasoning model responses
+  - Configurable base URL via `VITE_SCALEWAY_BASE_URL` (defaults to `https://api.scaleway.ai/v1`)
+- Added `'scaleway'` to `Provider` type in `types.ts`
+- Added 6 Scaleway models to `PROVIDER_MODELS` in `App.tsx`: Qwen 3 235B, DeepSeek R1 70B, Llama 3.3 70B, Mistral Small 3.2, GPT-OSS 120B, Qwen 3 Coder 30B
+- Updated `App.tsx` extraction dispatch to route to Scaleway service
+- Updated `components/ChatInterface.tsx` to dispatch chat to Scaleway service
+- Updated `components/AddColumnMenu.tsx` to dispatch prompt generation to Scaleway service
+- Added `VITE_SCALEWAY_API_KEY` and `VITE_SCALEWAY_BASE_URL` to `.env.example`
+- EU-hosted (Paris data center) — suitable for GDPR-compliant workflows
+
 ## 2026-02-11 — Visual Grounding + Load Project Fix
 
 ### Added: Visual Grounding (PDF page image + bounding box overlay)
