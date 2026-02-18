@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-02-18 — Docker fixes
+
+### Fixed: Docker builds now work end-to-end
+- Removed `mlx_vlm` from `server/requirements.txt` — Apple Silicon-only package not used anywhere; caused `pip install` to fail on Linux containers
+- Added root `.dockerignore` — prevents `node_modules/`, `server/venv/`, `server/__pycache__/`, `server/ocr_data/` from bloating the build context
+- Updated `Dockerfile.frontend` to declare `ARG`/`ENV` for all `VITE_*` build-time variables; defaults `VITE_API_URL` to `http://localhost:8000` so it works without a `.env` present
+- Updated `docker-compose.yml` to pass `VITE_*` vars via `build.args` (Vite bakes env vars at build time, not at runtime); removed unused `NODE_ENV` runtime env var from frontend
+- Fixed misleading comment in `.env.example` — `VITE_API_URL` should stay as `localhost:8000` because the browser (not a server) makes the requests; `http://backend:8000` only works inside the Docker network
+
 ## 2026-02-12 — Per-File Conversion Progress
 
 ### Improved: Document upload UX

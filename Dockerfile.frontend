@@ -1,4 +1,4 @@
-# Simple Frontend Dockerfile for Tabular Review
+# Frontend Dockerfile for Tabular Review
 FROM node:18-alpine
 
 # Set working directory
@@ -11,8 +11,23 @@ RUN npm install -g pnpm
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
-# Copy source code and build
+# Copy source code
 COPY . .
+
+# Build-time env vars (baked into the Vite bundle).
+# Defaults point to localhost so the browser can reach the backend.
+# Override via docker-compose build.args if needed.
+ARG VITE_API_URL=http://localhost:8000
+ARG VITE_GEMINI_API_KEY
+ARG VITE_OPENROUTER_API_KEY
+ARG VITE_SCALEWAY_API_KEY
+
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_GEMINI_API_KEY=$VITE_GEMINI_API_KEY
+ENV VITE_OPENROUTER_API_KEY=$VITE_OPENROUTER_API_KEY
+ENV VITE_SCALEWAY_API_KEY=$VITE_SCALEWAY_API_KEY
+
+# Build static assets
 RUN pnpm build
 
 # Install serve to serve static files

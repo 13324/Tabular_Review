@@ -12,8 +12,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - PYTHONUNBUFFERED=${PYTHONUNBUFFERED}
-      - VITE_API_URL=${VITE_API_URL}
+      - PYTHONUNBUFFERED=${PYTHONUNBUFFERED:-1}
     networks:
       - tabular-review-network
 
@@ -22,16 +21,19 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+      args:
+        # VITE_ vars must be passed as build args — they are baked in at build time.
+        # From the browser, the backend is always reachable at localhost:8000.
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:8000}
+        - VITE_GEMINI_API_KEY=${VITE_GEMINI_API_KEY}
+        - VITE_OPENROUTER_API_KEY=${VITE_OPENROUTER_API_KEY}
+        - VITE_SCALEWAY_API_KEY=${VITE_SCALEWAY_API_KEY}
     container_name: tabular-review-frontend
     restart: unless-stopped
     depends_on:
       - backend
     ports:
       - "3001:3000"
-    environment:
-      - VITE_API_URL=${VITE_API_URL}
-      - VITE_GEMINI_API_KEY=${VITE_GEMINI_API_KEY}
-      - NODE_ENV=${NODE_ENV}
     networks:
       - tabular-review-network
 

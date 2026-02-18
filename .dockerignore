@@ -1,0 +1,21 @@
+# Node
+node_modules/
+dist/
+.pnpm-store/
+
+# Python
+server/venv/
+server/__pycache__/
+server/*.pyc
+server/ocr_data/
+server/mock_letters/
+
+# Git / editor
+.git/
+.gitignore
+.DS_Store
+.vscode/
+.idea/
+
+# NOTE: .env is intentionally included so Vite can bake API keys into the build.
+# Do NOT push built images to public registries.
